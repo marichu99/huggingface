@@ -1,0 +1,305 @@
+package com.systech.servicedesk.service.impl;
+
+import com.systech.servicedesk.dao.ApprovalDao;
+import com.systech.servicedesk.dto.DocumentDTO;
+import com.systech.servicedesk.dto.NotificationArgsDTO;
+import com.systech.servicedesk.model.DeleteStatus;
+import com.systech.servicedesk.model.Document;
+import com.systech.servicedesk.model.DocumentTypes;
+import com.systech.servicedesk.model.NotificationType;
+import com.systech.servicedesk.model.Project;
+import com.systech.servicedesk.model.Ticket;
+import com.systech.servicedesk.model.User;
+import com.systech.servicedesk.model.enums.ApprovalStatus;
+import com.systech.servicedesk.model.enums.DocumentType;
+import com.systech.servicedesk.repository.DocumentRepository;
+import com.systech.servicedesk.repository.DocumentTypesRepository;
+import com.systech.servicedesk.repository.TicketRepository;
+import com.systech.servicedesk.service.DocumentService;
+import com.systech.servicedesk.service.DocumentTypeService;
+import com.systech.servicedesk.service.MailService;
+import com.systech.servicedesk.service.ProjectService;
+import com.systech.servicedesk.service.TicketService;
+import com.systech.servicedesk.service.UserService;
+import com.systech.servicedesk.util.UploadHelper;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+import javax.inject.Inject;
+import javax.transaction.Transactional;
+import org.apache.commons.beanutils.BeanUtils;
+import org.apache.commons.lang.StringUtils;
+import org.jboss.resteasy.plugins.providers.multipart.InputPart;
+import org.jboss.resteasy.plugins.providers.multipart.MultipartFormDataInput;
+
+import lombok.SneakyThrows;
+
+
+@Transactional
+public class DocumentServiceImpl implements DocumentService {
+
+    @Inject
+    private DocumentRepository documentRepository;
+
+    @Inject
+    private ProjectService projectService;
+
+    @Inject
+    UploadHelper uploadHelper;
+
+    @Inject
+    TicketService ticketService;
+
+    @Inject
+    TicketRepository ticketRepository;
+
+    @Inject
+    MailService mailService;
+
+    @Inject
+    UserService userService;
+
+    @Inject
+    DocumentTypeService documentTypeService;
+
+    @Inject
+    DocumentTypesRepository documentTypesRepository;
+
+    @Override
+    public DocumentDTO findSingleDocumentByTicketId(Long ticketId, Long documentTypeId, int start, int limit) {
+        Optional<Document> optionalDocument = documentRepository.findSingleDocumentByTicketId(ticketId, documentTypeId, start, limit);
+        return optionalDocument.map(this::mapDocumentToDTO).orElse(null);
+    }
+
+    @Override
+    public Document createOrUpdateDocument(MultipartFormDataInput multipartFormDataInput) throws Exception {
+
+        try {
+            Map<String, List<InputPart>> uploadForm = multipartFormDataInput.getFormDataMap();
+            String docName = (uploadForm.get("document_name").get(0).getBodyAsString());
+            String filePath = uploadAndGetFilePath(multipartFormDataInput, "document_file");
+
+            String ticketNumber = (uploadForm.get("ticketNumber").get(0).getBodyAsString()) == null ? "" : uploadForm.get("ticketNumber").get(0).getBodyAsString();
+            String ticketIdString = uploadForm.get("ticketId").get(0).getBodyAsString() == null ? "" : uploadForm.get("ticketId").get(0).getBodyAsString();
+
+            Long ticketId = (!StringUtils.isEmpty(ticketIdString) ? Long.parseLong(ticketIdString) : null);
+            String userId = (uploadForm.get("userId").get(0).getBodyAsString());
+
+            if (ticketId != null && !StringUtils.isEmpty(ticketIdString)) {
+                String documentTypeIdString = uploadForm.get("document_type_id").get(0).getBodyAsString();
+                Long documentTypeId = (!StringUtils.isEmpty(documentTypeIdString) ? Long.parseLong(documentTypeIdString) : null);
+
+
+                Ticket ticket = ticketService.getOneTicket(ticketId);
+                Project project = projectService.getProjectByTicketNumber(ticketNumber);
+
+                Document existingDocument = documentRepository.documentExistsByDocumentTypeAndTicketId(documentTypeId, ticketId);
+                Document document = new Document();
+
+                DocumentTypes documentTypes = documentTypeService.findDocumentTypeById(documentTypeId);
+                document.setDocumentName(docName);
+                document.setUser(userService.getSingleUser(Long.parseLong(userId)));
+                document.setTicket(ticket);
+                document.setDocumentTypes(documentTypes);
+                document.setDocumentDescription((uploadForm.get("document_description").get(0).getBodyAsString()));
+                document.setApprovalStatus(documentTypes.getDocumentType().equals(DocumentType.PERSONAL) ? ApprovalStatus.PERSONAL : ApprovalStatus.NOT_APPROVED);
+                document.setDocumentLink(filePath);
+
+                Set<Long> documentIds = ticket.getDocumentIds();
+                if (existingDocument != null) {
+                    document.setId(existingDocument.getId());
+                    document.setDeleteStatus(DeleteStatus.AVAILABLE);
+                    BeanUtils.copyProperties(existingDocument, document);
+                    documentRepository.edit(existingDocument);
+                    documentIds.add(existingDocument.getId());
+                } else {
+                    documentRepository.create(document);
+                    documentIds.add(document.getId());
+                }
+                ticket.setDocumentsByIds(documentIds);
+                ticketRepository.edit(ticket);
+
+                // send notification
+                mailService.sendNotifications(NotificationType.DOCUMENT_UPLOAD, NotificationArgsDTO.builder()
+                        .document(existingDocument != null ? existingDocument : document)
+                        .documentTypeName(documentTypes.getDocumentType().getName())
+                        .project(project)
+                        .ticket(ticket)
+                        .build());
+
+                return document;
+            } else {
+//                it is a personal document
+                Document document = new Document();
+
+                DocumentTypes documentTypes = documentTypesRepository.findAll().stream().filter(documentTypes1 -> {
+                    return documentTypes1.getDocumentType().getName().toLowerCase().contains("personal");
+                }).findFirst().get();
+                document.setDocumentName(docName);
+                document.setUser(userService.getSingleUser(Long.parseLong(userId)));
+                document.setDocumentTypes(documentTypes);
+                document.setDocumentDescription((uploadForm.get("document_description").get(0).getBodyAsString()));
+                document.setApprovalStatus(documentTypes.getDocumentType().equals(DocumentType.PERSONAL) ? ApprovalStatus.PERSONAL : ApprovalStatus.NOT_APPROVED);
+                document.setDocumentLink(filePath);
+                documentRepository.create(document);
+                return document;
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new Document();
+        }
+    }
+
+    @Override
+    public String uploadAndGetFilePath(MultipartFormDataInput multipartFormDataInput, String inputFileName) throws Exception {
+        return uploadHelper.uploadAndGetFilePath(multipartFormDataInput, inputFileName);
+    }
+
+
+    @Override
+    public List<Document> getAllDocuments() {
+        return documentRepository.findAll()
+                .stream()
+                .filter(document -> document.getDeleteStatus().equals(DeleteStatus.AVAILABLE))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<DocumentDTO> getDocumentsByDocumentTypeId(Long documentTypeId, int start, int limit) {
+
+        return mapDocumentsToDTO(documentRepository.getAllDocuments(start, limit)
+                .stream()
+                .filter(document -> {
+                     return document.getDocumentTypes().getId().equals(documentTypeId);
+                })
+                .collect(Collectors.toList()));
+    }
+
+    @SneakyThrows
+    @Override
+    public List<DocumentDTO> mapDocumentsToDTO(List<Document> documents) {
+        return documents.stream()
+                .map(this::mapDocumentToDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<DocumentDTO> getDocumentsByApproverId(Long approverId, int start, int limit) {
+        return mapDocumentsToDTO(documentRepository.getDocumentsByApproverId(approverId, start, limit));
+    }
+
+    @Override
+    public DocumentDTO mapDocumentToDTO(Document document) {
+        DocumentDTO dto = new DocumentDTO();
+        try {
+            dto.setProjectName(document.getTicket()!= null ? document.getTicket().getProject().getName():"Personal");
+            dto.setTicketNumber(document.getTicket()!= null ? document.getTicket().getTicketNumber():"Personal");
+            dto.setDocumentTypeId(document.getDocumentTypes().getId());
+            dto.setDocumentOwner(document.getUser().getEmail());
+            dto.setCreationDate(dto.getShortDateCreatedOn(document.getCreatedOn()));
+            dto.setComprehensiveDocumentTypeName(document.getDocumentTypes().getComprehensiveDocumentTypeName());
+            BeanUtils.copyProperties(dto, document);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return dto;
+    }
+
+    @Override
+    public List<DocumentDTO> findBySearchCriteria(String searchCriteria, int start, int limit) {
+        List<Document> documents = documentRepository.findBySearchCriteria(searchCriteria, start, limit);
+        return mapDocumentsToDTO(documents);
+    }
+
+    @Override
+    public List<Document> getDocumentsByEmail(String email, int start, int limit) {
+        return documentRepository.findAllByEmail(email, start, limit);
+    }
+
+    @Override
+    public List<DocumentDTO> getUserDocumentsByDocumentTypeId(Long documentTypeId, Long userId, int start, int limit) {
+        return mapDocumentsToDTO(documentRepository.findAllByUserDocumentsByDocumentTypeId(documentTypeId, userId, start, limit));
+    }
+
+    @Override
+    public List<DocumentDTO> getDocumentsByUserId(Long id, int start, int limit) {
+        return mapDocumentsToDTO(documentRepository.findAllByUserId(id, start, limit));
+    }
+
+    @Override
+    public Project getProjectByTicketNumber(String ticketNumber) throws Exception {
+        return projectService.getProjectByTicketNumber(ticketNumber);
+    }
+
+    @Override
+    public List<User> getUsersThatCanApproveDocumentType(Long documentTypeId, int start, int limit) {
+        return documentTypesRepository.find(documentTypeId).getDocumentApprovers();
+    }
+
+    @Override
+    public String approveDocumentById(ApprovalDao approvalDao) {
+        AtomicReference<String> errResponse = new AtomicReference<>("");
+        AtomicReference<String> successResponse = new AtomicReference<>("");
+        AtomicReference<Document> newDocument = new AtomicReference<>(new Document());
+        try {
+
+            Optional<Document> optionalDocument = documentRepository.findById(approvalDao.getDocumentId());
+            optionalDocument.ifPresent(document -> {
+                if (document.getApprovalStatus() == ApprovalStatus.APPROVED) {
+                    errResponse.set("Document is already approved");
+                    return;
+                }
+                newDocument.set(document);
+                try {
+                    if (canApproveDocument(document.getDocumentTypes().getId(), approvalDao.getUserId())) {
+                        document.setApprovalStatus(approvalDao.getApprovalStatus());
+                        document.setApproverUserId(approvalDao.getUserId());
+                        document.setComments(approvalDao.getComments());
+                        String response = "Document Updated to " + approvalDao.getApprovalStatus().getName() + " successfully";
+                        documentRepository.edit(document);
+                        successResponse.set(response);
+                    } else {
+                        errResponse.set("This User can not approve the document");
+                    }
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+            if (!StringUtils.isEmpty(errResponse.get())) {
+                return errResponse.get();
+            } else {
+                try {
+                    mailService.sendNotifications(NotificationType.DOCUMENT_UPDATE, NotificationArgsDTO.builder()
+                            .document(newDocument.get())
+                            .documentApprover(newDocument.get().getUser().getEmail())
+                            .documentTypeName(newDocument.get().getDocumentTypes().getDocumentType().getName())
+                            .project(projectService.getOneProject(newDocument.get().getTicket().getProject().getId()))
+                            .ticket(ticketService.getOneTicket(newDocument.get().getTicket().getId()))
+                            .emailCC(projectService.getOneProject(newDocument.get().getTicket().getProject().getId()).getContactUser().getEmail())
+                            .build());
+                    successResponse.set(successResponse.get().concat(" and notification sent successfully"));
+                    return successResponse.get();
+                } catch (Exception e) {
+                    successResponse.set(successResponse.get().concat(" and Notification sent failed"));
+                    return successResponse.get();
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "No Document Found";
+        }
+    }
+
+    Boolean canApproveDocument(Long documentTypeId, Long userId) {
+        User user = userService.findById(userId).orElseThrow(() -> new NullPointerException("User not found"));
+
+        List<DocumentTypes> documentTypes = user.getApprovedDocumentTypes();
+
+        return documentTypes.stream()
+                .anyMatch(d -> d.getId().equals(documentTypeId));
+    }
+}

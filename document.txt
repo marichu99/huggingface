@@ -1,0 +1,83 @@
+package com.systech.servicedesk.model;
+
+
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.JsonIdentityReference;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import com.systech.servicedesk.model.enums.ApprovalStatus;
+import com.systech.servicedesk.model.enums.DocumentType;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
+import org.hibernate.annotations.Type;
+
+import javax.persistence.*;
+
+@Entity
+@Table(name = "document")
+@AllArgsConstructor
+@NoArgsConstructor
+@Getter
+@Setter
+@SuperBuilder
+
+public class Document extends BaseEntity{
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column
+    private String documentName;
+
+    @Column
+    private Long approverUserId;
+
+    @ManyToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "document_type_id")
+    @JsonIdentityInfo(generator = ObjectIdGenerators.PropertyGenerator.class,property = "id")
+    @JsonIdentityReference(alwaysAsId = true)
+    @JsonProperty("document_type_id")
+    private DocumentTypes documentTypes;
+
+    @ManyToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "ticket_id")
+    @JsonIdentityInfo(generator = ObjectIdGenerators.PropertyGenerator.class, property = "id")
+    @JsonIdentityReference(alwaysAsId = true)
+    @JsonProperty("ticket_id")
+    private Ticket ticket;
+
+    @ManyToOne
+    @JoinColumn(name = "user_id")
+    @JsonIdentityInfo(generator = ObjectIdGenerators.PropertyGenerator.class, property = "id")
+    @JsonIdentityReference(alwaysAsId = true)
+    @JsonProperty("user_id")
+    private User user;
+
+    @Column
+    @Lob
+    @Type(type = "org.hibernate.type.TextType")
+    private String comments;
+
+    @Column
+    @Lob
+    @NonNull
+    @Type(type = "org.hibernate.type.TextType")
+    private String documentDescription;
+
+    @Column
+    @Lob
+    @NonNull
+    @Type(type = "org.hibernate.type.TextType")
+    private String documentLink;
+
+    @Column
+    @Enumerated(EnumType.STRING)
+    private ApprovalStatus approvalStatus;
+
+    public static Document fromId(long documentId) {
+        Document document = new Document();
+        document.setId(documentId);
+        return document;
+    }
+}

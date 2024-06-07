@@ -1,0 +1,48 @@
+package com.systech.servicedesk.service;
+
+import com.systech.servicedesk.dao.ApprovalDao;
+import com.systech.servicedesk.dto.DocumentDTO;
+import com.systech.servicedesk.fileupload.FileModel;
+import com.systech.servicedesk.model.Document;
+import com.systech.servicedesk.model.Project;
+import com.systech.servicedesk.model.User;
+import com.systech.servicedesk.model.enums.ApprovalStatus;
+import org.jboss.resteasy.plugins.providers.multipart.MultipartFormDataInput;
+
+import java.lang.reflect.InvocationTargetException;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+public interface DocumentService {
+
+    Document createOrUpdateDocument(MultipartFormDataInput multipartFormDataInput) throws Exception;
+
+    String uploadAndGetFilePath(MultipartFormDataInput multipartFormDataInput, String inputFileName) throws Exception;
+
+    List<Document> getAllDocuments();
+
+    List<DocumentDTO> getDocumentsByDocumentTypeId(Long documentTypeId, int start, int limit);
+
+    List<DocumentDTO> mapDocumentsToDTO(List<Document> documents);
+
+    List<DocumentDTO> getDocumentsByApproverId(Long approverId, int start, int limit);
+
+    List<DocumentDTO> findBySearchCriteria(String searchCriteria, int start, int limit);
+
+    DocumentDTO mapDocumentToDTO(Document document) throws Exception;
+
+    List<Document> getDocumentsByEmail(String email, int start, int limit);
+
+    List<DocumentDTO> getUserDocumentsByDocumentTypeId(Long documentTypeId, Long userId, int start, int limit);
+
+    DocumentDTO findSingleDocumentByTicketId(Long ticketId, Long documentTypeId, int start, int limit);
+
+    List<DocumentDTO> getDocumentsByUserId(Long id, int start, int limit);
+
+    Project getProjectByTicketNumber(String ticketNumber) throws Exception;
+
+    List<User> getUsersThatCanApproveDocumentType(Long documentTypeId, int start, int limit);
+
+    String approveDocumentById(ApprovalDao approvalDao) throws Exception;
+}

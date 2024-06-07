@@ -1,0 +1,241 @@
+package com.systech.servicedesk.controller;
+
+import com.systech.servicedesk.dao.ApprovalDao;
+import com.systech.servicedesk.dto.DocumentTypeDTO;
+import com.systech.servicedesk.model.Document;
+import com.systech.servicedesk.model.DocumentTypes;
+import com.systech.servicedesk.model.TicketType;
+import com.systech.servicedesk.model.User;
+import com.systech.servicedesk.model.enums.ApprovalStatus;
+import com.systech.servicedesk.security.CseOrAdminJwtTokenNeeded;
+import com.systech.servicedesk.security.JwtTokenNeeded;
+import com.systech.servicedesk.security.CseOrAdminJwtTokenNeeded;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.jboss.resteasy.plugins.providers.multipart.MultipartFormDataInput;
+
+import javax.ws.rs.*;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+
+@Path("/document")
+@Tag(name = "Document's apis")
+@Consumes(MediaType.APPLICATION_JSON)
+@Produces(MediaType.APPLICATION_JSON)
+public interface DocumentController {
+
+    @POST
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    @Produces(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Create a document", responses = {
+            @ApiResponse(description = "Document creation",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Document.class))),
+            @ApiResponse(responseCode = "404", description = "Document not created")})
+    Response createOrUpdateDocument(MultipartFormDataInput multipartFormDataInput) throws Exception;
+
+
+    @Path("/getAllDocuments")
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    @CseOrAdminJwtTokenNeeded
+    @Operation(summary = "Get all documents trails", responses = {
+            @ApiResponse(description = "Admin documents list",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Document.class))),
+            @ApiResponse(responseCode = "404", description = "Document not found")})
+    Response getAllDocuments(@DefaultValue("0") @QueryParam("start") int start,
+                             @DefaultValue("100") @QueryParam("limit") int limit);
+
+    @Path("/getDocumentByTicketId/{ticketId}/{documentTypeId}")
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    @JwtTokenNeeded
+    @Operation(summary = "Get all documents trails", responses = {
+            @ApiResponse(description = "Admin documents list",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Document.class))),
+            @ApiResponse(responseCode = "404", description = "Document not found")})
+    Response getDocumentByTicketId(@PathParam("ticketId") Long ticketId, @PathParam("documentTypeId") Long documentTypeId,@DefaultValue("0") @QueryParam("start") int start,
+                             @DefaultValue("100") @QueryParam("limit") int limit) throws Exception;
+
+    @Path("/getDocumentsByTicketId/{ticketId}")
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    @JwtTokenNeeded
+    @Operation(summary = "Get all documents trails", responses = {
+            @ApiResponse(description = "Admin documents list",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Document.class))),
+            @ApiResponse(responseCode = "404", description = "Document not found")})
+    Response getDocumentsByTicketId(@PathParam("ticketId") Long ticketId, @DefaultValue("0") @QueryParam("start") int start,
+                             @DefaultValue("100") @QueryParam("limit") int limit);
+
+
+    @Path("/getApprovedDocumentsByTicketId/{ticketId}")
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    @JwtTokenNeeded
+    @Operation(summary = "Get all documents trails", responses = {
+            @ApiResponse(description = "Admin documents list",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Document.class))),
+            @ApiResponse(responseCode = "404", description = "Document not found")})
+    Response getApprovedDocumentsByTicketId(@PathParam("ticketId") Long ticketId, @DefaultValue("0") @QueryParam("start") int start,
+                                    @DefaultValue("100") @QueryParam("limit") int limit);
+
+
+    @Path("/getAllDocumentsByDocumentTypeId/{id}/")
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    @JwtTokenNeeded
+    @Operation(summary = "Get all documents trails", responses = {
+            @ApiResponse(description = "Admin documents list",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Document.class))),
+            @ApiResponse(responseCode = "404", description = "Document not found")})
+    Response getAllDocumentsByDocumentTypeId(@DefaultValue("0") @QueryParam("start") int start,
+                                             @DefaultValue("100") @QueryParam("limit") int limit, @PathParam("id") Long id);
+
+
+    @Path("/getDocumentTypeByName/{documentTypeName}/")
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    @JwtTokenNeeded
+    @Operation(summary = "Get all documents trails", responses = {
+            @ApiResponse(description = "Admin documents list",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Document.class))),
+            @ApiResponse(responseCode = "404", description = "Document not found")})
+    Response getDocumentTypeByName(@DefaultValue("0") @QueryParam("start") int start,
+                                             @DefaultValue("100") @QueryParam("limit") int limit, @PathParam("documentTypeName") String documentTypeName) throws Exception;
+
+
+    @Path("/checkIfExistsByDocumentTypeName/{documentTypeName}/")
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    @JwtTokenNeeded
+    @Operation(summary = "Get all documents trails", responses = {
+            @ApiResponse(description = "Admin documents list",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Document.class))),
+            @ApiResponse(responseCode = "404", description = "Document not found")})
+    Response checkIfExistsByDocumentTypeName(@DefaultValue("0") @QueryParam("start") int start,
+                                   @DefaultValue("100") @QueryParam("limit") int limit, @PathParam("documentTypeName") String documentTypeName) throws Exception;
+
+    @Path("/getAllUserDocumentsByDocumentTypeId/{userId}/{documentTypeId}")
+    @GET
+    @JwtTokenNeeded
+    @Produces(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Get all documents by user id", responses = {
+            @ApiResponse(description = "Email documents list",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Document.class))),
+            @ApiResponse(responseCode = "404", description = "Document not found")})
+    Response getAllUserDocumentsByDocumentTypeId(@PathParam("userId") Long userId, @PathParam("documentTypeId") Long documentTypeId, @DefaultValue("0") @QueryParam("start") int start,
+                                                 @DefaultValue("100") @QueryParam("limit") int limit);
+
+
+    @Path("/getDocumentsByUserId/{id}")
+    @GET
+    @JwtTokenNeeded
+    @Produces(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Get all documents by user id", responses = {
+            @ApiResponse(description = "Email documents list",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Document.class))),
+            @ApiResponse(responseCode = "404", description = "Document not found")})
+    Response getDocumentsByUserId(@PathParam("id") Long id, @DefaultValue("0") @QueryParam("start") int start,
+                                  @DefaultValue("100") @QueryParam("limit") int limit);
+
+
+    @Path("/getApproversByDocumentTypeId/{documentTypeId}")
+    @GET
+    @JwtTokenNeeded
+    @Produces(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Get all approvers documents by document type id", responses = {
+            @ApiResponse(description = "Email documents list",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = User.class))),
+            @ApiResponse(responseCode = "404", description = "Document not found")})
+    Response getApproversByDocumentTypeId(@PathParam("documentTypeId") Long id, @DefaultValue("0") @QueryParam("start") int start,
+                                  @DefaultValue("100") @QueryParam("limit") int limit);
+
+    @Path("/getDocumentsToBeApprovedByUser/{userId}")
+    @GET
+    @JwtTokenNeeded
+    @Produces(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Get all  documents by to be approved by user by user id", responses = {
+            @ApiResponse(description = "Email documents list",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Document.class))),
+            @ApiResponse(responseCode = "404", description = "Document not found")})
+    Response getDocumentsToBeApprovedByUser(@PathParam("userId") Long id, @DefaultValue("0") @QueryParam("start") int start,
+                                          @DefaultValue("100") @QueryParam("limit") int limit);
+
+    @Path("/deleteById/{id}")
+    @GET
+    @JwtTokenNeeded
+    @Produces(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Delete documents by ID", responses = {
+            @ApiResponse(description = "Document deletion",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Document.class))),
+            @ApiResponse(responseCode = "404", description = "Document not deleted")})
+    Response deleteDocumentById(@PathParam("id") Long id);
+
+    @Path("/approveDocumentById/")
+    @POST
+    @JwtTokenNeeded
+    @Produces(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Approve documents by ID", responses = {
+            @ApiResponse(description = "Document Approval",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Document.class))),
+            @ApiResponse(responseCode = "404", description = "Document not approved")})
+    Response approveDocumentById(ApprovalDao approvalDao) throws Exception;
+
+
+    @Path("/saveDocumentApprover")
+    @POST
+    @CseOrAdminJwtTokenNeeded
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Create document approver", responses = {
+            @ApiResponse(description = "Document Approver Creation",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = DocumentTypes.class))),
+            @ApiResponse(responseCode = "404", description = "Document approval creation not successful")})
+    Response saveDocumentApprover(DocumentTypes documentTypes) throws Exception;
+
+
+    @Path("/getDocumentTypes")
+    @GET
+    @JwtTokenNeeded
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    @Operation(
+            summary = "Get all document types",
+            responses = {
+                    @ApiResponse(description = "document type list",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(implementation = DocumentTypeDTO.class))),
+                    @ApiResponse(responseCode = "404", description = "Document type not found")})
+    Response getDocumentTypes() throws Exception;
+
+
+    @Path("/getDocumentBySearchCriteria/{searchCriteria}")
+    @GET
+    @JwtTokenNeeded
+    @Produces(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Get documents by search", responses = {
+            @ApiResponse(description = "Document search",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = Document.class))),
+            @ApiResponse(responseCode = "404", description = "Document not found")})
+    Response getDocumentBySearchCriteria(@PathParam("searchCriteria") String search, @DefaultValue("0") @QueryParam("start") int start,
+                                         @DefaultValue("100") @QueryParam("limit") int limit);
+}
