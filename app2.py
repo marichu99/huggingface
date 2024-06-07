@@ -56,7 +56,7 @@ text_splitter = CharacterTextSplitter.from_tiktoken_encoder(chunk_size=7500, chu
 doc_splits = text_splitter.split_documents(txt_docs)
 
 # 2. Convert documents to Embeddings and store them
-openai_api_key = "sk-proj-gmeR00ug3I2asSWNhLCQT3BlbkFJyfGTrcxpmWSKSXYZZAdS"  # Replace this with your actual OpenAI API key
+openai_api_key = ""  # Replace this with your actual OpenAI API key
 embedder = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 vectorstore = Chroma.from_documents(
     documents=doc_splits,
