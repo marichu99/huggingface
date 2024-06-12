@@ -1,6 +1,5 @@
 from transformers import AutoTokenizer, TFAutoModelForCausalLM
 import tensorflow as tf
-
 from langchain_community.document_loaders import WebBaseLoader
 from langchain.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -87,10 +86,10 @@ def generate_spring_boot_code(prompt):
     # Generate text for each encoded chunk individually
     generated_chunks = []
     for encoded_chunk in encoded_chunks:
-        # print("The encoded chunk is ",encoded_chunk)
-        outputs = code_generation_model.generate(encoded_chunk, max_length=256, num_return_sequences=1)
+        # Adjust the max_length parameter to handle longer inputs
+        max_length = 256 if encoded_chunk.shape[1] < 256 else encoded_chunk.shape[1] + 50
+        outputs = code_generation_model.generate(encoded_chunk, max_length=max_length, num_return_sequences=1)
         generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        print("The generated text is ",generated_text)
         generated_chunks.append(generated_text)
 
     # Concatenate the generated text chunks to form the complete output

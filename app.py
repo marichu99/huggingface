@@ -2,6 +2,7 @@ from langchain_community.document_loaders import WebBaseLoader, PyPDFLoader
 from langchain_community.vectorstores import Chroma
 from langchain_community import embeddings
 from langchain_community.chat_models import ChatOllama
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -47,11 +48,14 @@ all_docs_list = docs_list + pdf_docs_list
 text_splitter = CharacterTextSplitter.from_tiktoken_encoder(chunk_size=7500, chunk_overlap=100)
 doc_splits = text_splitter.split_documents(pdf_docs_list)
 
+embedder = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
+
 # 2. Convert documents to Embeddings and store them
 vectorstore = Chroma.from_documents(
     documents=doc_splits,
     collection_name="rag-chroma",
-    embedding=embeddings.ollama.OllamaEmbeddings(model='nomic-embed-text'),
+    embedding=embedder
 )
 retriever = vectorstore.as_retriever()
 
